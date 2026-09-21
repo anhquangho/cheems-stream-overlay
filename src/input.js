@@ -1,0 +1,7 @@
+class InputManager {
+
+    onMessage(data) {
+
+    }
+
+}
