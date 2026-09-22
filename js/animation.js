@@ -11,10 +11,20 @@ const Animation = {
     leavingCrouch: false,
     currentUpperBody: null,
     upperBodyEntry: null,
+    resetVersion: 0,
 
     update() {
         if (!Character.loaded) {
             return;
+        }
+        if (this.resetVersion !== State.resetVersion) {
+            Character.reset();
+            this.currentMovement = null;
+            this.movementEntry = null;
+            this.leavingCrouch = false;
+            this.currentUpperBody = null;
+            this.upperBodyEntry = null;
+            this.resetVersion = State.resetVersion;
         }
         this.updateMovement();
         this.updateUpperBody();
@@ -77,65 +87,51 @@ const Animation = {
         const current = this.currentUpperBody;
 
         if (!State.hasWeapon) {
-            State.weaponDrawn = false;
-        }
-
-        if (current === null) {
-            this.playUpperBody(this.getUnarmedLoop(), true);
-            return;
-        }
-
-        const isOneShot =
-            current === anims.drawWeapon ||
-            current === anims.armRunStart ||
-            current === anims.armRunEnd ||
-            current === anims.fire;
-
-        if (isOneShot) {
-            if (current === anims.drawWeapon) {
-                const drawing = !this.upperBodyEntry.reverse;
-                if (State.weaponDrawn !== drawing) {
-                    if (State.hasWeapon) {
-                        this.playDrawTransition(State.weaponDrawn);
-                    }
-                    return;
-                }
-            }
-            if (!this.upperBodyEntry.isComplete()) {
-                return;
-            }
-            this.finishOneShot(current);
-            return;
-        }
-
-        if (current === anims.unarmedIdle) {
-            if (State.hasWeapon) {
-                if (State.weaponDrawn) {
-                    this.playDrawTransition(true);
-                } else {
-                    this.playUpperBody(anims.unarmedHolsterIdle, true);
-                }
-            }
-        } else if (current === anims.unarmedHolsterIdle) {
-            if (!State.hasWeapon) {
+            if (current !== anims.unarmedIdle) {
                 this.playUpperBody(anims.unarmedIdle, true);
-            } else if (State.weaponDrawn) {
-                this.playDrawTransition(true);
             }
-        } else if (current === anims.armedIdle) {
-            if (!State.weaponDrawn) {
+            return;
+        }
+
+        if (current === anims.drawWeapon) {
+            if (State.weaponDrawn === this.upperBodyEntry.reverse) {
+                this.playDrawTransition(State.weaponDrawn);
+            } else if (this.upperBodyEntry.isComplete()) {
+                this.finishOneShot(current);
+            }
+            return;
+        }
+
+        const unarmed = current === null || current === anims.unarmedIdle || current === anims.unarmedHolsterIdle;
+        if (!State.weaponDrawn) {
+            if (!unarmed) {
                 this.playDrawTransition(false);
-            } else if (State.firing) {
-                this.playUpperBody(anims.fire, false);
-            } else if (State.movement === "run") {
-                this.playUpperBody(anims.armRunStart, false);
+            } else if (current !== anims.unarmedHolsterIdle) {
+                this.playUpperBody(anims.unarmedHolsterIdle, true);
             }
-        } else if (current === anims.armRunLoop) {
-            if (State.firing) {
-                this.playUpperBody(anims.fire, false);
-            } else if (!State.weaponDrawn || State.movement !== "run") {
-                this.playUpperBody(anims.armRunEnd, false);
-            }
+            return;
+        }
+        if (unarmed) {
+            this.playDrawTransition(true);
+            return;
+        }
+        if (State.firing && current !== anims.fire) {
+            this.playUpperBody(anims.fire, false);
+            return;
+        }
+
+        const running = State.movement === "run";
+        if (current === anims.armedIdle && running) {
+            this.playUpperBody(anims.armRunStart, false);
+        } else if ((current === anims.armRunLoop || current === anims.armRunStart) && !running) {
+            this.playUpperBody(anims.armRunEnd, false);
+        } else if (current === anims.armRunEnd && running) {
+            this.playUpperBody(anims.armRunStart, false);
+        } else if (
+            (current === anims.armRunStart || current === anims.armRunEnd || current === anims.fire) &&
+            this.upperBodyEntry.isComplete()
+        ) {
+            this.finishOneShot(current);
         }
     },
 
@@ -162,30 +158,19 @@ const Animation = {
     finishOneShot(current) {
         const anims = Config.animations.upperBody;
 
-        if (current === anims.drawWeapon) {
-            if (this.upperBodyEntry.reverse) {
+        if (!State.weaponDrawn) {
+            if (current === anims.drawWeapon) {
                 this.playUpperBody(this.getUnarmedLoop(), true);
             } else {
-                this.playUpperBody(anims.armedIdle, true);
-            }
-        } else if (current === anims.armRunStart) {
-            this.playUpperBody(anims.armRunLoop, true);
-        } else if (current === anims.armRunEnd) {
-            if (!State.weaponDrawn) {
                 this.playDrawTransition(false);
-            } else {
-                this.playUpperBody(anims.armedIdle, true);
             }
-        } else if (current === anims.fire) {
-            if (State.firing && State.weaponDrawn) {
-                this.playUpperBody(anims.fire, false);
-            } else if (State.weaponDrawn && State.movement === "run") {
-                this.playUpperBody(anims.armRunLoop, true);
-            } else if (!State.weaponDrawn) {
-                this.playDrawTransition(false);
-            } else {
-                this.playUpperBody(anims.armedIdle, true);
-            }
+        } else if (State.firing) {
+            this.playUpperBody(anims.fire, false);
+        } else if (State.movement === "run") {
+            const starting = current === anims.drawWeapon || current === anims.armRunEnd;
+            this.playUpperBody(starting ? anims.armRunStart : anims.armRunLoop, !starting);
+        } else {
+            this.playUpperBody(anims.armedIdle, true);
         }
     },
 

@@ -21,6 +21,11 @@ const Character = {
         return this.spine.state.setAnimation(track, name, loop);
     },
 
+    reset() {
+        this.spine.state.clearTracks();
+        this.spine.skeleton.setToSetupPose();
+    },
+
     // Places the character bottom-center of the given view.
     position(viewWidth, viewHeight) {
         const data = this.spine.skeleton.data;

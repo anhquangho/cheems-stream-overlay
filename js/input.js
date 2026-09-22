@@ -5,6 +5,8 @@
 const Input = {
     socket: null,
     heldKeys: new Set(),
+    ignoredKeys: new Set(),
+    mouseHeld: false,
     crouching: false,
 
     connect() {
@@ -42,27 +44,27 @@ const Input = {
     },
 
     onKeyDown(keycode) {
-        if (this.heldKeys.has(keycode)) {
+        if (this.heldKeys.has(keycode) || this.ignoredKeys.has(keycode)) {
             return; // ignore OS auto-repeat
         }
         this.heldKeys.add(keycode);
 
         const keys = Config.keys;
+        if (keycode === keys.reset) {
+            this.reset();
+            return;
+        }
         if (keycode === keys.crouch) {
             this.crouching = true;
-        } else if (keycode === keys.itemTake) {
-            State.hasWeapon = true;
-            State.weaponDrawn = false;
-        } else if (keycode === keys.itemPutAway) {
-            State.hasWeapon = false;
-            State.weaponDrawn = false;
         } else if (keycode === keys.weaponSlot1 || keycode === keys.weaponSlot2) {
-            if (State.hasWeapon) {
-                State.weaponDrawn = !State.weaponDrawn;
-            }
+            State.hasWeapon = true;
+            State.weaponSlot = keycode === keys.weaponSlot1 ? 1 : 2;
+            State.weaponDrawn = true;
         } else if (keycode === keys.holster) {
-            if (State.hasWeapon) {
-                State.weaponDrawn = false;
+            State.hasWeapon = true;
+            State.weaponDrawn = !State.weaponDrawn;
+            if (State.weaponDrawn) {
+                State.weaponSlot = 1;
             }
         }
         this.updateMovement();
@@ -70,6 +72,7 @@ const Input = {
 
     onKeyUp(keycode) {
         this.heldKeys.delete(keycode);
+        this.ignoredKeys.delete(keycode);
         if (keycode === Config.keys.crouch) {
             this.crouching = false;
         }
@@ -77,15 +80,33 @@ const Input = {
     },
 
     onMouseDown(button) {
-        if (button === Config.mouse.fire) {
+        if (button === Config.mouse.fire && !this.mouseHeld) {
+            this.mouseHeld = true;
             State.firing = true;
+            this.updateMovement();
         }
     },
 
     onMouseUp(button) {
         if (button === Config.mouse.fire) {
+            this.mouseHeld = false;
             State.firing = false;
+            this.updateMovement();
         }
+    },
+
+    reset() {
+        for (const keycode of this.heldKeys) {
+            this.ignoredKeys.add(keycode);
+        }
+        this.heldKeys.clear();
+        this.crouching = false;
+        State.movement = "idle";
+        State.hasWeapon = true;
+        State.weaponDrawn = false;
+        State.weaponSlot = 1;
+        State.firing = false;
+        State.resetVersion++;
     },
 
     isMoving() {
@@ -108,7 +129,7 @@ const Input = {
     updateMovement() {
         if (this.crouching) {
             State.movement = "crouch";
-        } else if (!this.isMoving()) {
+        } else if (!this.isMoving() || (State.weaponDrawn && State.firing)) {
             State.movement = "idle";
         } else {
             State.movement = this.isSprinting() ? "run" : "walk";
