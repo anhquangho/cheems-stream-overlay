@@ -6,5 +6,7 @@ const State = {
     movement: "idle", // "idle" | "walk" | "run" | "crouch"
     hasWeapon: false,
     weaponDrawn: false,
+    weaponSlot: 1,
     firing: false,
+    resetVersion: 0,
 };

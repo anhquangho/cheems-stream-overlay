@@ -20,6 +20,7 @@ const Config = {
         weaponSlot2: 3,   // 2
         itemPutAway: 66,  // F8
         itemTake: 67,     // F9
+        reset: 68,
     },
 
     mouse: {
